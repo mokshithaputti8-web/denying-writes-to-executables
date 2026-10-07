@@ -1,40 +1,28 @@
-/*
- * =====================================================================
- *  CO2_Process_Control.c
- * =====================================================================
+/* =====================================================================
+ * CO2_Process_Control.c
+ * ---------------------------------------------------------------------
+ * Process control: fork() -> execve() -> waitpid()
  *
- *  COURSE OUTCOME 2 (CO2): Process Control
+ *   Parent --fork()--> Child --execve()--> target_program runs
+ *   Parent waits with waitpid() and reads the exit status.
  *
- *  CONCEPT DEMONSTRATED:
- *  ----------------------
- *  The classic Unix/Linux process life cycle:
+ * Link to the project theme: while the child is running
+ * target_program, the parent tries to open that same file for writing.
+ * The kernel answers with ETXTBSY, because the file is now the
+ * executable image of a live process.
  *
- *      Parent process
- *            |
- *          fork()               -> creates a new (child) process
- *            |
- *      Child process created
- *            |
- *          execve()              -> child replaces itself with a new program
- *            |
- *      target_program runs
- *            |
- *      target_program exits
- *            |
- *      Parent waits using waitpid()
- *
- *  This program is the "control" process: it creates a child, makes
- *  that child become target_program, and then waits for it to finish,
- *  printing clear status messages (with PIDs) at every stage.
- *
- *  SYSTEM CALLS / CONCEPTS USED:
- *      fork(), execve(), waitpid(), getpid(), exit status handling
- * =====================================================================
- */
+ * System calls: fork, execve, waitpid, getpid, getppid, open, usleep
+ * ===================================================================== */
+
+#define _DEFAULT_SOURCE
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 
 #define TARGET_PATH "./target_program"
@@ -42,74 +30,65 @@
 int main(void)
 {
     printf("=====================================================\n");
-    printf(" CO2 DEMO: Process Control (fork -> exec -> wait)\n");
+    printf(" Process Control Demo: fork -> exec -> wait\n");
     printf("=====================================================\n\n");
 
-    printf("[Parent] I am the parent process. My PID = %d\n", getpid());
-    printf("[Parent] About to create a child process using fork()...\n\n");
-    fflush(stdout);   /* flush before fork() so buffered text is not
-                          duplicated by the child (important when output
-                          is redirected to a file/pipe, not a terminal) */
+    printf("[Parent] My PID = %d\n", getpid());
+    printf("[Parent] Creating a child process using fork()...\n\n");
+    fflush(stdout);   /* avoid duplicated buffered output in the child */
 
-    /* -----------------------------------------------------------
-     * STEP 1: fork() - create a new child process.
-     * ----------------------------------------------------------- */
     pid_t pid = fork();
-
     if (pid < 0) {
-        /* fork() failed */
         perror("fork failed");
         exit(EXIT_FAILURE);
     }
 
     if (pid == 0) {
-        /* -------------------------------------------------------
-         * STEP 2: CHILD PROCESS
-         * ------------------------------------------------------- */
-        printf("[Child ] Child process created successfully! My PID = %d\n", getpid());
-        printf("[Child ] Parent's PID (from child's view) = %d\n", getppid());
-        printf("[Child ] Now replacing myself with target_program using execve()...\n\n");
+        /* ------------------------- CHILD ------------------------- */
+        printf("[Child ] Created. My PID = %d, my parent's PID = %d\n",
+               getpid(), getppid());
+        printf("[Child ] Replacing myself with target_program using execve()...\n\n");
+        fflush(stdout);
 
         char *args[] = { TARGET_PATH, NULL };
         char *envp[] = { NULL };
-
-        /* execve() replaces the child's memory image with target_program.
-           If successful, the code below execve() never runs. */
         execve(TARGET_PATH, args, envp);
 
-        /* If we reach here, execve() failed. */
         perror("execve failed (did you run 'make' first?)");
-        exit(EXIT_FAILURE);
+        _exit(EXIT_FAILURE);
     }
 
-    /* -------------------------------------------------------
-     * STEP 3: PARENT PROCESS continues here.
-     * ------------------------------------------------------- */
-    printf("[Parent] Child process launched with PID = %d\n", pid);
-    printf("[Parent] Waiting for child (target_program) to terminate...\n\n");
+    /* --------------------------- PARENT --------------------------- */
+    printf("[Parent] Child launched with PID = %d\n", pid);
+
+    usleep(500000);   /* give the child time to finish execve() */
+
+    printf("[Parent] While the child runs, I try to open %s for writing...\n",
+           TARGET_PATH);
+    int fd = open(TARGET_PATH, O_WRONLY);
+    if (fd == -1) {
+        printf("[Parent] WRITE DENIED -> errno = %d (%s)\n", errno, strerror(errno));
+        if (errno == ETXTBSY)
+            printf("[Parent] The kernel protects the running executable.\n");
+    } else {
+        printf("[Parent] open() succeeded (nothing is written). Closing it.\n");
+        close(fd);
+    }
+
+    printf("[Parent] Waiting for the child to terminate...\n\n");
+    fflush(stdout);
 
     int status;
-    pid_t finished_pid = waitpid(pid, &status, 0);
+    pid_t done = waitpid(pid, &status, 0);
 
-    printf("\n[Parent] wait() returned. Child PID %d has terminated.\n", finished_pid);
+    printf("\n[Parent] waitpid() returned: child %d has terminated.\n", done);
+    if (WIFEXITED(status))
+        printf("[Parent] Child exited normally with exit code %d.\n", WEXITSTATUS(status));
+    else if (WIFSIGNALED(status))
+        printf("[Parent] Child was killed by signal %d.\n", WTERMSIG(status));
 
-    /* -----------------------------------------------------------
-     * STEP 4: Inspect and report the child's exit status.
-     * ----------------------------------------------------------- */
-    if (WIFEXITED(status)) {
-        printf("[Parent] target_program exited normally with exit code %d.\n",
-               WEXITSTATUS(status));
-    } else if (WIFSIGNALED(status)) {
-        printf("[Parent] target_program was terminated by signal %d.\n",
-               WTERMSIG(status));
-    } else {
-        printf("[Parent] target_program terminated abnormally.\n");
-    }
-
-    printf("\n[Parent] Process life cycle complete:\n");
-    printf("   Parent -> fork() -> Child created -> exec() ->\n");
-    printf("   target_program ran -> target_program exited ->\n");
-    printf("   Parent detected termination via waitpid().\n");
-
+    printf("\n=====================================================\n");
+    printf(" Demonstration complete.\n");
+    printf("=====================================================\n");
     return 0;
 }

@@ -56,7 +56,7 @@ int main(void)
     ssize_t len;
 
     printf("=====================================================\n");
-    printf(" CO1: Kernel Protection Against Writing to Executables\n");
+    printf(" Kernel Protection: Writing to a Running Executable\n");
     printf("=====================================================\n\n");
 
     printf("Step 1: Discovering the path of my own running executable...\n");
@@ -127,7 +127,7 @@ int main(void)
     }
 
     printf("\n=====================================================\n");
-    printf(" CO1 demonstration complete.\n");
+    printf(" Demonstration complete.\n");
     printf("=====================================================\n");
 
     return 0;

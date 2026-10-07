@@ -1,0 +1,8 @@
+CO1_Kernel_Protection
+CO2_Process_Control
+CO3_IPC_Signals
+CO4_Virtual_Memory
+CO5_File_System
+CO6_Thread_Sync
+target_program
+demo_copy*

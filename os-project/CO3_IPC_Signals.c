@@ -87,7 +87,7 @@ int main(void)
     char buffer[100];
 
     printf("=====================================================\n");
-    printf(" CO3: IPC (pipe) and Signals (SIGCHLD)\n");
+    printf(" IPC Demo: Pipe and SIGCHLD Signal\n");
     printf("=====================================================\n\n");
 
     /* -----------------------------------------------------------
@@ -199,7 +199,7 @@ int main(void)
                "terminated and was reaped.\n");
 
         printf("\n=====================================================\n");
-        printf(" CO3 demonstration complete.\n");
+        printf(" Demonstration complete.\n");
         printf("=====================================================\n");
     }
 

@@ -1,41 +1,35 @@
 /* =====================================================================
  * target_program.c
  * ---------------------------------------------------------------------
- * This is a small, harmless executable that is launched by:
- *      - CO2_Process_Control.c   (using fork + execve)
- *      - CO3_IPC_Signals.c       (using fork + execve)
+ * A small, harmless executable that the other programs launch with
+ * fork() + execve() so they have a *running* executable to test.
  *
- * It simply:
- *      1. Prints its own Process ID (PID)
- *      2. Announces that it is running
- *      3. Sleeps for a few seconds (simulating some "work")
- *      4. Exits normally
- *
- * Because this program keeps running for a few seconds, it is also
- * useful to manually test CO1 (try opening it for writing from another
- * terminal while it runs, and you will get ETXTBSY).
- * =====================================================================
- */
+ * It prints its PID, "works" (sleeps) for a few seconds, then exits.
+ * Usage:  ./target_program [seconds]     (default = 3 seconds)
+ * ===================================================================== */
 
-#define _POSIX_C_SOURCE 200809L  /* needed so pid_t/sleep() are visible with -std=c99 */
+#define _POSIX_C_SOURCE 200809L
 
 #include <stdio.h>
-#include <unistd.h>    /* for getpid(), sleep() */
-#include <sys/types.h> /* for pid_t */
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
 
-int main(void)
+int main(int argc, char *argv[])
 {
-    pid_t my_pid = getpid();
+    unsigned int seconds = 3;
+    if (argc > 1) {
+        int s = atoi(argv[1]);
+        if (s > 0 && s < 60) seconds = (unsigned int)s;
+    }
 
-    printf("[target_program] Hello! My PID is %d\n", my_pid);
-    printf("[target_program] I am now running...\n");
-    fflush(stdout);   /* make sure output is printed immediately */
+    printf("[target_program] Hello! My PID is %d\n", getpid());
+    printf("[target_program] I am now running (for %u seconds)...\n", seconds);
+    fflush(stdout);
 
-    /* Simulate doing some work for 3 seconds */
-    sleep(3);
+    sleep(seconds);
 
     printf("[target_program] Work finished. Exiting normally now.\n");
     fflush(stdout);
-
     return 0;
 }
